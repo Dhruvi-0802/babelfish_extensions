@@ -8,4 +8,16 @@ for i in range(5):
 
 import os
 d=os.environ
-print(d.keys())
+#print(d.keys())
+
+file1=open("start.py","r")
+readfile=file1.read()
+
+print(readfile)
+if "pytest" in readfile:
+    print("Found")
+else:
+    print("Not found")
+
+file1.close()
+
