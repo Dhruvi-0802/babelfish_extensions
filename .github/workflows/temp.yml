@@ -1,0 +1,16 @@
+name: temp tests
+on: [push, pull_request]
+
+jobs:
+  run-temp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        id: checkout
+      - name: list files
+        id: files
+        uses: jitterbit/get-changed-files@v1
+      - run: |
+          for changed_file in ${{ steps.files.outputs.all }}; do
+            echo "Do something with this ${changed_file}."
+          done
