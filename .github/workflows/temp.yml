@@ -9,5 +9,5 @@ jobs:
         id: checkout
       - name: list files
         id: files
-      - run: |
+        run: |
           git diff --stat $GITHUB_BASE_REF..$GITHUB_HEAD_REF
