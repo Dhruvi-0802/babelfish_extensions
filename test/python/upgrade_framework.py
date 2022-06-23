@@ -1,68 +1,78 @@
 import re
 from pathlib import Path
+import subprocess
+import sys
+from utils.config import config_dict as cfg
 
-#Currently storing only the last files results, either iterate through all file sin the function or append the file
-#So a separate function required to iterate through the files and give the name of file to be appended as well
 #Find pattern will then have 2 filename args
 
 #list of installation and upgrade scripts
 def list_scripts_drop():
-    inpPath="../../contrib/babelfishpg_tsql/sql"
+    inpPath="../../contrib"
     path=Path(inpPath)
-
     scripts=[]
 
-    for f in path.glob("*.sql"):
-        print(f)
+    for f in path.glob("*/sql/upgrades/*.sql"):
         scripts.append(f)
 
-    upgrades=inpPath+'/upgrades'
-
-    pth=Path(upgrades)
-   # print(Path.cwd())
-   # print(pth)
-    for f in pth.glob("*.sql"):
-        print(f)
-        scripts.append(f)
-
-    for i in scripts:
-        find_pattern(i)
+    # path=path.joinpath("upgrades")
+    # for f in path.glob("*.sql"):
+    #     # print(f)
+    #     scripts.append(f)
+    return scripts
 
 
-def find_pattern(filename):
-    with  open(filename, "r") as file, open("temp.out", "a") as expected_file:
-        #Pattern from input file
-        #print(cfg["pattern"])
-        #pat=cfg["pattern"].strip("'")
-
-        #Taking default pattern for now
-        pat="^drop "
+def find_pattern_drop():
+    path = Path.cwd().joinpath("output", "Script_verif_framework")
+    Path.mkdir(path, parents = True, exist_ok = True)
+    f_path = path.joinpath("drop-found.out")
+    with open(f_path, "w") as expected_file:
+        scripts=list_scripts_drop()
+        pat=r"^drop "
         #print(pat)
-        line = file.readline()
 
-        while line:
-            line=line.strip()
-            if line.startswith("--"):
-                line=file.readline()
-                continue
-            else:
-                match_f=re.search(pat,line,re.I)
-                if match_f:
-                    print(line)
-                    if "(" in line:
-                        line=line.split('(')[0]
-                        print(line)
+        for filename in scripts:
+            with  open(filename, "r") as file:
+  
+                line = file.readline()
 
-                    line=line.rstrip(';')
-                    
-                    linewords=line.split()
-                    stopwords = ['drop','create','view','procedure','function','view','table','cascade','if','exists','owned','by','role','as','or','replace']
-                    resultwords  = [word for word in linewords if word.lower() not in stopwords]
-                    result = ' '.join(resultwords)
-                    print("result : ",result)
-                    expected_file.write("Unexpected drop found for object {0} in file {1}\n".format(result,filename))
-                    #expected_file.write(result+"\n")
-            line=file.readline()
+                readflag=True
+                while line:
+                    line=line.strip()
+                    if line.startswith("--") or line.startswith("/*") or line.startswith("#"):
+                        line=file.readline()
+                        continue
+                    elif readflag==True:
+                        match_f=re.search(pat,line,re.I)
+                        if match_f:
+                            print(filename)
+                            print(line)
+                            if "(" in line:
+                                line=line.split('(')[0]
+                                print(line)
+
+                            line=line.rstrip(';')
+                            if "using" in line.lower():
+                                line=line.lower().split('using')[0]
+
+                            linewords=line.split()
+                            object_category=['table','view','function','procedure','role','class','operator','cast']
+                            category='object'
+                            for word in linewords:
+                                if word.lower() in object_category:
+                                    category=word.lower()
+                                    break
+                            if category=='class':
+                                category='operator class'
+                            
+                            stopwords = ['drop','create','view','procedure','function','view','table','cascade','if','exists','owned','by','role','as','or','replace','class','operator','cast']
+                            resultwords  = [word for word in linewords if word.lower() not in stopwords]
+                            obj_name = ' '.join(resultwords)
+                            print("result : ",obj_name)
+                            expected_file.write("Unexpected drop found for {0} {1} in file {2}\n".format(category,obj_name,filename))
+                    if len(re.findall(r"[$]{2}",line,re.I)) == 1:
+                        readflag=not readflag
+                    line=file.readline()
 
 
 
@@ -71,7 +81,7 @@ def find_pattern(filename):
 ##For JDBC tests 
 
 #list of installation and upgrade scripts
-def list_scripts():
+def list_scripts_create():
     inpPath="../../contrib/babelfishpg_tsql/sql"
     path=Path(inpPath)
 
@@ -81,22 +91,18 @@ def list_scripts():
         print(f)
         scripts.append(f)
 
-    upgrades=inpPath+'/upgrades'
-
-    pth=Path(upgrades)
-   # print(Path.cwd())
-   # print(pth)
-    for f in pth.glob("*.sql"):
-        print(f)
+    path=path.joinpath("upgrades")
+    for f in path.glob("*.sql"):
+        # print(f)
         scripts.append(f)
 
-    for i in scripts:
-        find_pattern_create(i)
+    #Removing helper functions
+    scripts.remove(Path(inpPath+"/sys_function_helpers.sql"))
+    return scripts
 
 
-#files for checking function names
-def list_files():
-    inpPath="../JDBC/input"
+#List of files in JDBC framework
+def list_files(inpPath):
     path=Path(inpPath)
 
     files=[]
@@ -104,130 +110,180 @@ def list_files():
     for f in path.rglob("*.*"):
         #print(f)
         files.append(f)
-    print(len(files))
     return files
 
 
 
+def find_pattern_create():
+    scripts=list_scripts_create()
+    object_names=set()
+    #pat=r"^create [\w\s]*\b(view)\b"
+    pat=r"^create [\w\s]*\b({0})\b".format(cfg["createObjectSearch"].replace(',','|'))
+    for filename in scripts:
+        with  open(filename, "r") as file:
 
-def find_pattern_create(filename):
-    with  open(filename, "r") as file, open("temp_create.out", "a") as expected_file:
+            print(filename)
+            line = file.readline()
 
-        #Pattern from input file
-        #print(cfg["pattern"])
-        #pat=cfg["pattern"].strip("'")
+            readflag=True
+            while line:
+                line=line.strip()
+                if line.startswith("--") or line.startswith("/*") or line.startswith("#"):
+                    line=file.readline()
+                    continue
+                elif readflag==True:
+                    match_f=re.search(pat,line,re.I)
+                    if match_f:
+                        print(line)
+                        if "(" in line:
+                            line=line.split('(')[0]+"[(]"
+                        
+                        # if " as " in line.lower():
+                        #     line=line.lower().split(' as ')[0]
+                        # if " ON " in line:
+                        #     line=line.split(' ON ')[0]
+                            # print(line)
 
-        #Taking default pattern for now
-        pat="^create [\w\s]*(view|procedure)"
-        # pat="^create "
-        #print(pat)
-        line = file.readline()
+                        line=line.rstrip(';')
+                        linewords=line.split()
+                        object_category=['table','view','function','procedure','role','aggregate','schema','domain','collation','index']
+                        category='object'
+                        for word in linewords:
+                            if word.lower() in object_category:
+                                category=word.lower()
+                        stopwords = ['drop','create','view','procedure','function','table','domain',
+                                    'index','schema','temporary','aggregate','cascade','if','exists','owned',
+                                    'by','role','as','or','replace','collation','not','select']
+                        resultwords  = [word for word in linewords if word.lower() not in stopwords]
+                        obj_name = ' '.join(resultwords)
 
-        while line:
-            line=line.strip()
-            if line.startswith("--"):
+                        print("word to be searched : ",obj_name.lower())
+
+                        object_names.add((category,obj_name))
+                if len(re.findall(r"[$]{2}",line,re.I)) == 1:
+                    readflag=not readflag    
                 line=file.readline()
-                continue
-            else:
-                match_f=re.search(pat,line,re.I)
-                if match_f:
-                    # print(line)
-                    if "(" in line:
-                        line=line.split('(')[0]
-                    # if " as " in line.lower():
-                    #     line=line.lower().split(' as ')[0]
-                    # if " ON " in line:
-                    #     line=line.split(' ON ')[0]
-                        # print(line)
+    print(object_names)
+    return object_names
 
-                    line=line.rstrip(';')
-                    
-                    linewords=line.split()
-                    stopwords = ['drop','create','view','procedure','function','view','table','domain',
-                                'index','schema','temporary','aggregate','cascade','if','exists','owned',
-                                'by','role','as','or','replace','collation','not','select']
-                    resultwords  = [word for word in linewords if word.lower() not in stopwords]
-                    result = ' '.join(resultwords)
-                    print("result : ",result)
 
-                    flag=False
-                    for i in files:
-                        with open(i, "r") as testfile:
+def find_inp_JDBC():
+    files=list_files("../JDBC/input")
+    object_name=find_pattern_create()
+    path = Path.cwd().joinpath("output", "Script_verif_framework")
+    Path.mkdir(path, parents = True, exist_ok = True)
+    f_path = path.joinpath("tests-not-found.out")
+    with open(f_path, "w") as expected_file:
+        for object in object_name:
+
+            #Flag for object name found or not in the JDBC input files
+            flag=False
+            print(object[1])
+            for i in files:
+                with open(i, "r") as testfile:
+                    testline=testfile.readline()
+
+                    while testline:
+                        testline=testline.strip()
+                        if testline.startswith("--") or testline.startswith("/*") or testline.startswith("#"):
                             testline=testfile.readline()
+                            continue
 
-                            # result_wo_sys=result.split('.',maxsplit=2)[1]
-                            # print(result_wo_sys)
-                            # or re.findall(result_wo_sys, testline,re.I)
-                            while testline:
-                                if testline.strip().startswith("--"):
-                                    testline=testfile.readline()
-                                    continue
+                        elif(re.search(r"\b"+object[1]+r"\b",testline,re.I)):
+                            flag=True
+                            print("Found\nline :   ",testline)
+                            print("file name : ",i)
+                            break
+                        testline=testfile.readline()
+                    else:
+                        continue
+                    break
 
-                                elif(re.search(result,testline,re.I)):
-                                    flag=True
-                                    print("line :   ",testline)
-                                    print(result)
-                                    print(i,"\n\n")
-                                    break
-                                testline=testfile.readline()
+            if(flag==False and "sys." in object[1]):
+                result_wo_sys=object[1].split('.',maxsplit=2)[1]
 
-                    #check_object(result)
-                    #expected_file.write("Unexpected drop found for object {0} \n".format(result))
-                    if(not flag and "." in result):
-                        result_wo_sys=result.split('.',maxsplit=2)[1]
-                        print(result_wo_sys)
-
-                        for i in files:
-                            with open(i, "r") as testfile:
-                                testline=testfile.readline()
+                for i in files:
+                    with open(i, "r") as testfile:
+                        testline=testfile.readline()
                                 
-                                while testline:
-                                    if testline.strip().startswith("--"):
-                                        testline=testfile.readline()
-                                        continue
+                        while testline:
+                            testline=testline.strip()
+                            if testline.startswith("--") or testline.startswith("/*") or testline.startswith("#"):
+                                testline=testfile.readline()
+                                continue
 
-                                    elif(re.search(result_wo_sys, testline,re.I)):
-                                        flag=True
-                                        print("line :   ",testline)
-                                        print(result)
-                                        print(i,"\n\n")
-                                        break
-                                    testline=testfile.readline()
-                    if not flag:
-                        expected_file.write("Could not find tests for {0}\n".format(result))
-                    #print(match_f)
-            line=file.readline()
-
-
+                            elif(re.search(r"\b"+result_wo_sys+r"\b", testline,re.I)):
+                                flag=True
+                                print("Found\nline :   ",testline)
+                                print("file name : ",i)
+                                break
+                            testline=testfile.readline()
+                        else:
+                            continue
+                        break
+            if flag==False:
+                expected_file.write("Could not find tests for {0} {1}\n".format(object[0],object[1]))
+            #print(match_f)
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##For any search
 
 
-def verify_pattern_def(filename):
-    with  open(filename, "r") as file:
-        # matches=[]
-        # print(cfg["pattern"])
-        # pat=cfg["pattern"].strip("'")
+def find_patterns():
+    files=list_files("../../contrib/babelfishpg_tsql/sql/upgrades")
+    path = Path.cwd().joinpath("output", "Script_verif_framework")
+    Path.mkdir(path, parents = True, exist_ok = True)
+    f_path = path.joinpath("Pattern_match_results.out")
+    with open(f_path, "w") as expected_file:
+        patterns=cfg["searchPatterns"].split(',')
+            # pat="^create [\w\s]*(function|view)"
+            # pat="^create ((?!function|view).)*$"
+        for pattern in patterns:
+            # pattern = r"{0}".format(pattern)
+            # pattern="query\d"
+            # print(pattern)
+            expected_file.write("Pattern : {0} \n".format(pattern))
+            for filename in files:
+                with  open(filename, "r") as file:
+                    # matches=[]
+                    # print(cfg["pattern"])
+                    # pat=cfg["pattern"].strip("'")
 
-#        pat="^create [\w\s]*(function|view)"
-        pat="^create ((?!function|view).)*$"
-        print(pat)
-        line = file.readline()
+                    line = file.readline()
 
-        while line:
-            line=line.strip()
-            match_f=re.findall(pat,line,re.I)
-            if match_f:
-                print(line)
-                #print(match_f)
-            line=file.readline()
-    #print(matches)
+                    while line:
+                        match_f=re.findall(pattern,line,re.I)
+                        if match_f:
+                            # print(line)
+                            expected_file.write("{0} \n".format(line))
+                        line=file.readline()
 
 # find_pattern_create("demo.txt")
 
-files=list_files()
-# find_pattern_create("../../contrib/babelfishpg_tsql/sql/upgrades/babelfishpg_tsql--2.0.0--2.1.0.sql")
-# list_scripts()
-list_scripts_drop()
+# def compare_outfiles(outfile, expected_file, logfname, filename, logger):
+#     try:
+#         diff_file = Path.cwd().joinpath("logs", logfname, filename, filename + ".diff")
+#         f_handle = open(diff_file, "wb")
+
+#         if "sql_expected" in expected_file.as_uri():
+#             if sys.platform.startswith("win"):
+#                 proc = subprocess.run(args = ["fc", expected_file, outfile], stdout = f_handle, stderr = f_handle)
+#             else:
+#                 proc = subprocess.run(args = ["diff", "-a", "-u", "-I", "~~ERROR", expected_file, outfile], stdout = f_handle, stderr = f_handle)
+#         else:
+#             if sys.platform.startswith("win"):
+#                 proc = subprocess.run(args = ["fc", expected_file, outfile], stdout = f_handle, stderr = f_handle)
+#             else:
+#                 proc = subprocess.run(args = ["diff", "-a", "-u", expected_file, outfile], stdout = f_handle, stderr = f_handle)
+
+# find_pattern_create("demo.txt")
+
+def main():
+    find_pattern_drop()
+    find_inp_JDBC()
+    find_patterns()
+    #diff fil output left
+
+if __name__=="__main__":
+    main()
