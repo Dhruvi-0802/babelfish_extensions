@@ -16,4 +16,4 @@ jobs:
         id: run-test
         run: |
           cd test/python
-          python3 upgrade_framework.py
+          python3 sql_validation.py

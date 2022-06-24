@@ -1,10 +1,11 @@
+from datetime import datetime
+import logging
 import re
 from pathlib import Path
 import subprocess
-import sys
 from utils.config import config_dict as cfg
 
-#Find pattern will then have 2 filename args
+
 
 #list of installation and upgrade scripts
 def list_scripts_drop():
@@ -22,14 +23,14 @@ def list_scripts_drop():
     return scripts
 
 
-def find_pattern_drop():
-    path = Path.cwd().joinpath("output", "Script_verif_framework")
+def find_pattern_drop(fname,logger):
+    path = Path.cwd().joinpath("output", "Sql_validation_framework")
     Path.mkdir(path, parents = True, exist_ok = True)
-    f_path = path.joinpath("drop-found.out")
+    f_path = path.joinpath(fname+".out")
+    logger.info("Running tests for unexpected drop statements !")
     with open(f_path, "w") as expected_file:
         scripts=list_scripts_drop()
-        pat=r"^drop "
-        #print(pat)
+        pattern=r"^drop "
 
         for filename in scripts:
             with  open(filename, "r") as file:
@@ -43,19 +44,20 @@ def find_pattern_drop():
                         line=file.readline()
                         continue
                     elif readflag==True:
-                        match_f=re.search(pat,line,re.I)
+                        match_f=re.search(pattern,line,re.I)
                         if match_f:
-                            print(filename)
-                            print(line)
-                            if "(" in line:
-                                line=line.split('(')[0]
-                                print(line)
+                            # print(filename)
+                            # print(line)
+                            newline=line
+                            if "(" in newline:
+                                newline=newline.split('(')[0]
+                                # print(line)
 
-                            line=line.rstrip(';')
-                            if "using" in line.lower():
-                                line=line.lower().split('using')[0]
+                            newline=newline.rstrip(';')
+                            if "using" in newline.lower():
+                                newline=newline.lower().split('using')[0]
 
-                            linewords=line.split()
+                            linewords=newline.split()
                             object_category=['table','view','function','procedure','role','class','operator','cast']
                             category='object'
                             for word in linewords:
@@ -68,11 +70,12 @@ def find_pattern_drop():
                             stopwords = ['drop','create','view','procedure','function','view','table','cascade','if','exists','owned','by','role','as','or','replace','class','operator','cast']
                             resultwords  = [word for word in linewords if word.lower() not in stopwords]
                             obj_name = ' '.join(resultwords)
-                            print("result : ",obj_name)
+                            # print("result : ",obj_name)
                             expected_file.write("Unexpected drop found for {0} {1} in file {2}\n".format(category,obj_name,filename))
                     if len(re.findall(r"[$]{2}",line,re.I)) == 1:
                         readflag=not readflag
                     line=file.readline()
+    logger.info("Tests for drop statements completed successfully!!")
 
 
 
@@ -88,7 +91,7 @@ def list_scripts_create():
     scripts=[]
 
     for f in path.glob("*.sql"):
-        print(f)
+        # print(f)
         scripts.append(f)
 
     path=path.joinpath("upgrades")
@@ -114,15 +117,17 @@ def list_files(inpPath):
 
 
 
-def find_pattern_create():
+def find_pattern_create(logger):
     scripts=list_scripts_create()
     object_names=set()
-    #pat=r"^create [\w\s]*\b(view)\b"
+    
+    logger.info("Running tests for create statements !")
+    
     pat=r"^create [\w\s]*\b({0})\b".format(cfg["createObjectSearch"].replace(',','|'))
     for filename in scripts:
         with  open(filename, "r") as file:
 
-            print(filename)
+            # print(filename)
             line = file.readline()
 
             readflag=True
@@ -134,9 +139,10 @@ def find_pattern_create():
                 elif readflag==True:
                     match_f=re.search(pat,line,re.I)
                     if match_f:
-                        print(line)
-                        if "(" in line:
-                            line=line.split('(')[0]+"[(]"
+                        # print(line)
+                        newline=line
+                        if "(" in newline:
+                            newline=newline.split('(')[0]+"[(]"
                         
                         # if " as " in line.lower():
                         #     line=line.lower().split(' as ')[0]
@@ -144,8 +150,8 @@ def find_pattern_create():
                         #     line=line.split(' ON ')[0]
                             # print(line)
 
-                        line=line.rstrip(';')
-                        linewords=line.split()
+                        newline=newline.rstrip(';')
+                        linewords=newline.split()
                         object_category=['table','view','function','procedure','role','aggregate','schema','domain','collation','index']
                         category='object'
                         for word in linewords:
@@ -157,28 +163,30 @@ def find_pattern_create():
                         resultwords  = [word for word in linewords if word.lower() not in stopwords]
                         obj_name = ' '.join(resultwords)
 
-                        print("word to be searched : ",obj_name.lower())
+                        # print("word to be searched : ",obj_name.lower())
 
                         object_names.add((category,obj_name))
                 if len(re.findall(r"[$]{2}",line,re.I)) == 1:
                     readflag=not readflag    
                 line=file.readline()
-    print(object_names)
+                
+    # print(object_names)
+    logger.info("Found all create objects successfully!")
     return object_names
 
 
-def find_inp_JDBC():
+def find_inp_JDBC(fname,logger):
     files=list_files("../JDBC/input")
-    object_name=find_pattern_create()
-    path = Path.cwd().joinpath("output", "Script_verif_framework")
+    object_name=find_pattern_create(logger)
+    path = Path.cwd().joinpath("output", "Sql_validation_framework")
     Path.mkdir(path, parents = True, exist_ok = True)
-    f_path = path.joinpath("tests-not-found.out")
+    f_path = path.joinpath(fname+".out")
     with open(f_path, "w") as expected_file:
         for object in object_name:
 
             #Flag for object name found or not in the JDBC input files
             flag=False
-            print(object[1])
+            # print(object[1])
             for i in files:
                 with open(i, "r") as testfile:
                     testline=testfile.readline()
@@ -191,8 +199,8 @@ def find_inp_JDBC():
 
                         elif(re.search(r"\b"+object[1]+r"\b",testline,re.I)):
                             flag=True
-                            print("Found\nline :   ",testline)
-                            print("file name : ",i)
+                            # print("Found\nline :   ",testline)
+                            # print("file name : ",i)
                             break
                         testline=testfile.readline()
                     else:
@@ -214,31 +222,34 @@ def find_inp_JDBC():
 
                             elif(re.search(r"\b"+result_wo_sys+r"\b", testline,re.I)):
                                 flag=True
-                                print("Found\nline :   ",testline)
-                                print("file name : ",i)
+                                # print("Found\nline :   ",testline)
+                                # print("file name : ",i)
                                 break
                             testline=testfile.readline()
                         else:
                             continue
                         break
             if flag==False:
-                expected_file.write("Could not find tests for {0} {1}\n".format(object[0],object[1]))
-            #print(match_f)
+                expected_file.write("Could not find tests for {0} {1}\n".format(object[0],object[1].split('[')[0]))
+    logger.info("Tests for create statements completed successfully!!")
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ##For any search
 
 
-def find_patterns():
+def find_patterns(logger):
     files=list_files("../../contrib/babelfishpg_tsql/sql/upgrades")
-    path = Path.cwd().joinpath("output", "Script_verif_framework")
+    
+    path = Path.cwd().joinpath("output", "Sql_validation_framework")
     Path.mkdir(path, parents = True, exist_ok = True)
     f_path = path.joinpath("Pattern_match_results.out")
+    
+    logger.info("Running random pattern search!!")
+    
     with open(f_path, "w") as expected_file:
         patterns=cfg["searchPatterns"].split(',')
-            # pat="^create [\w\s]*(function|view)"
-            # pat="^create ((?!function|view).)*$"
+
         for pattern in patterns:
             # pattern = r"{0}".format(pattern)
             # pattern="query\d"
@@ -246,7 +257,7 @@ def find_patterns():
             expected_file.write("Pattern : {0} \n".format(pattern))
             for filename in files:
                 with  open(filename, "r") as file:
-                    # matches=[]
+  
                     # print(cfg["pattern"])
                     # pat=cfg["pattern"].strip("'")
 
@@ -258,32 +269,110 @@ def find_patterns():
                             # print(line)
                             expected_file.write("{0} \n".format(line))
                         line=file.readline()
+    logger.info("Patterns found successfully!!")
 
-# find_pattern_create("demo.txt")
 
-# def compare_outfiles(outfile, expected_file, logfname, filename, logger):
-#     try:
-#         diff_file = Path.cwd().joinpath("logs", logfname, filename, filename + ".diff")
-#         f_handle = open(diff_file, "wb")
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#Main function,  logs and output file comparisons
 
-#         if "sql_expected" in expected_file.as_uri():
-#             if sys.platform.startswith("win"):
-#                 proc = subprocess.run(args = ["fc", expected_file, outfile], stdout = f_handle, stderr = f_handle)
-#             else:
-#                 proc = subprocess.run(args = ["diff", "-a", "-u", "-I", "~~ERROR", expected_file, outfile], stdout = f_handle, stderr = f_handle)
-#         else:
-#             if sys.platform.startswith("win"):
-#                 proc = subprocess.run(args = ["fc", expected_file, outfile], stdout = f_handle, stderr = f_handle)
-#             else:
-#                 proc = subprocess.run(args = ["diff", "-a", "-u", expected_file, outfile], stdout = f_handle, stderr = f_handle)
 
-# find_pattern_create("demo.txt")
+def compare_outfiles(outfile, expected_file, logfname, filename, logger):
+    try:
+        diff_file = Path.cwd().joinpath("logs", logfname, "sql_validation", filename + ".diff")
+        f_handle = open(diff_file, "wb")
+
+        proc_sort = subprocess.run(args = ["sort", "-o", expected_file, expected_file])
+        proc_sort = subprocess.run(args = ["sort", "-o", outfile, outfile])
+
+        proc = subprocess.run(args = ["diff", "-a", "-u", "-I", "~~ERROR",expected_file, outfile], stdout = f_handle, stderr = f_handle)
+        
+        rcode = proc.returncode
+        f_handle.close()
+        
+        if rcode == 0:
+            logger.info("No difference found!")
+            return True
+        elif rcode ==  1:
+            with open(diff_file,"r") as f:
+                print(f.read())
+            return False
+        elif rcode == 2:
+            with open(diff_file,"r") as f:
+                print(f.read())
+            logger.error("Some error occured while executing the diff command!")
+            return False
+        else:
+            logger.error("Unknown exit code encountered while running diff!")
+            return False
+        
+    except Exception as e:
+        logger.error(str(e))
+    
+    return False
+
+
+
+
+def create_logger():
+    log_folder_name = datetime.now().strftime('log_%H_%M_%d_%m_%Y')
+    path = Path.cwd().joinpath("logs", log_folder_name)
+    Path.mkdir(path, parents = True, exist_ok = True)
+
+    filename="sql_validation"
+    logname = datetime.now().strftime(filename + '_%H_%M_%d_%m_%Y.log')
+
+    path = Path.cwd().joinpath("logs", log_folder_name,filename)
+    Path.mkdir(path, parents = True, exist_ok = True)
+
+    #Creating logger with two handlers, file as well as console
+    #File logger
+    file_path=path.joinpath(logname)
+
+    fh = logging.FileHandler(filename = file_path, mode = "w")
+    formatter = logging.Formatter('%(asctime)s-%(levelname)s-%(message)s')
+    fh.setFormatter(formatter)
+    logger = logging.getLogger(filename)
+    logger.addHandler(fh)
+    logger.setLevel(logging.DEBUG)
+
+    #console logger
+    sh = logging.StreamHandler()
+    sh.setFormatter(formatter)
+    logger.addHandler(sh)
+    logger.setLevel(logging.DEBUG)
+
+    return log_folder_name ,logger
+
+
+def close_logger(logger):
+    if logger is None:
+        return
+    else:
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler) 
+            handler.close()
 
 def main():
-    find_pattern_drop()
-    find_inp_JDBC()
-    find_patterns()
-    #diff fil output left
+
+    fname_drop="Expected_drop"
+    fname_create="Expected_create"
+
+    logfname,logger=create_logger()
+
+    find_pattern_drop(fname_drop, logger)
+    expected_file=Path.cwd().joinpath("expected", "Sql_validation_framework",fname_drop+".out")
+    outfile=Path.cwd().joinpath("output", "Sql_validation_framework",fname_drop+".out")
+    result1=compare_outfiles(outfile, expected_file, logfname,fname_drop,logger)
+    
+    find_inp_JDBC(fname_create, logger)
+    expected_file=Path.cwd().joinpath("expected", "Sql_validation_framework",fname_create+".out")
+    outfile=Path.cwd().joinpath("output", "Sql_validation_framework",fname_create+".out")
+    result2=compare_outfiles(outfile, expected_file, logfname, fname_create,logger)
+
+    find_patterns(logger)
+    close_logger(logger)
+
+    assert result1 == 0 and result2 == 0, "Test Passed"
 
 if __name__=="__main__":
     main()
