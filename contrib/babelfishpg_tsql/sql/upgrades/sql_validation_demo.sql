@@ -1,4 +1,4 @@
-Drop PROCEDURE demo_proc;
+--Drop PROCEDURE demo_proc;
 
 create or replace view demo_view as
 select distinct
