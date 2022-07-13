@@ -259,9 +259,12 @@ def main():
     logfname, logger = create_logger()
     
     file_name = "dependency_check"
-    
+
+    outfile = Path.cwd().joinpath("output", "sql_validation_framework")
+    Path.mkdir(outfile, parents = True, exist_ok = True)
+    outfile = outfile.joinpath(file_name + ".out")
+
     expected_file = Path.cwd().joinpath("expected", "sql_validation_framework", file_name + ".out")
-    outfile = Path.cwd().joinpath("output", "sql_validation_framework", file_name + ".out")
     get_dependencies(outfile, logger)
     
     result2 = compare_outfiles(outfile, expected_file, logfname, file_name, logger)
