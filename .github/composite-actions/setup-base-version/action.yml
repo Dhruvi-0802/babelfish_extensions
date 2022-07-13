@@ -106,6 +106,7 @@ runs:
       run: |
         cd ~
         pip3 install psycopg2
+      shell: bash
 
     - name: Run dependency check
       id: run-dependency-check
@@ -113,6 +114,7 @@ runs:
       run: |
         cd test/python
         python3 upgrade_validation.py
+      shell: bash
 
     - name: Upload artifacts
       if: always() && steps.run-dependency-check.outcome == 'failure'
