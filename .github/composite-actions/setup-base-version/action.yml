@@ -105,7 +105,7 @@ runs:
       if: always() && steps.install-python.outcome == 'success'
       run: |
         cd ~
-        pip3 install psycopg2
+        pip3 install pyodbc pymssql psycopg2
       shell: bash
 
     - name: Run dependency check
