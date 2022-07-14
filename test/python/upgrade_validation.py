@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from utils.db_client import Db_Client_psycopg
+from utils.db_client_psql import Db_Client_psycopg
 from pathlib import Path
 import sys
 import subprocess
@@ -28,13 +28,18 @@ def get_dependencies(file, logger):
                     AND d.refclassid = 'pg_class'::regclass 
                     AND d.deptype in('n') 
                     AND d.refobjid in (SELECT oid FROM pg_class where relkind = 'v' and relnamespace = 'sys'::regnamespace)
-                    AND v.relnamespace not in('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                    AND v.relnamespace not in('sys'::regnamespace, 'pg_catalog'::regnamespace,
+                        CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                            THEN 'information_schema'::regnamespace
+                        END ,
+                        CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                            THEN 'information_schema_tsql'::regnamespace
+                        END)
                 GROUP BY d.refobjid; """
             bbl_cursor.execute(query)
             result = bbl_cursor.fetchall()
             for i in result:
                 expected_file.write("Views {0} {1}\n".format(i[1],i[2]))
-                logger.info(i)
 
             logger.info('\nsys Functions : ')
             # get user defined views dependent on sys functions 
@@ -49,7 +54,13 @@ def get_dependencies(file, logger):
                             AND d.refclassid = 'pg_proc'::regclass 
                             AND d.deptype in('n') 
                             AND d.refobjid in (SELECT oid FROM pg_proc where prokind = 'f' and pronamespace = 'sys'::regnamespace)
-                            AND v.relnamespace not in('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                            AND v.relnamespace not in('sys'::regnamespace, 'pg_catalog'::regnamespace,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                                    THEN 'information_schema'::regnamespace
+                                END ,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                                    THEN 'information_schema_tsql'::regnamespace
+                                END)
                         GROUP BY d.refobjid
                     )
                     UNION ALL
@@ -59,7 +70,13 @@ def get_dependencies(file, logger):
                         WHERE d.refclassid = 'pg_proc'::regclass 
                             AND d.deptype in ('a')
                             AND d.refobjid in (SELECT oid FROM pg_proc where prokind = 'f' and pronamespace = 'sys'::regnamespace)
-                            AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                            AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                                    THEN 'information_schema'::regnamespace
+                                END ,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                                    THEN 'information_schema_tsql'::regnamespace
+                                END)
                         GROUP BY d.refobjid
                     )
                 ) AS temp GROUP BY id;"""       
@@ -68,7 +85,6 @@ def get_dependencies(file, logger):
             result = bbl_cursor.fetchall()
             for i in result:
                 expected_file.write("Functions {0} {1}\n".format(i[1],i[2]))
-                logger.info(i)
 
 
             logger.info('\nsys operators : ')
@@ -83,7 +99,13 @@ def get_dependencies(file, logger):
                             AND d.refclassid = 'pg_operator'::regclass 
                             AND d.deptype in('n') 
                             AND d.refobjid in (SELECT oid FROM pg_operator where oid > 16384)
-                            AND v.relnamespace not in('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                            AND v.relnamespace not in('sys'::regnamespace, 'pg_catalog'::regnamespace, 
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                                    THEN 'information_schema'::regnamespace
+                                END ,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                                    THEN 'information_schema_tsql'::regnamespace
+                                END)
                         GROUP BY refobjid
                     )
                         UNION ALL
@@ -93,7 +115,13 @@ def get_dependencies(file, logger):
                         WHERE d.refclassid = 'pg_operator'::regclass 
                             AND d.deptype in ('a')
                             AND d.refobjid in (select oid FROM pg_operator where oid > 16384)
-                            AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                            AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                                    THEN 'information_schema'::regnamespace
+                                END ,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                                    THEN 'information_schema_tsql'::regnamespace
+                                END)
                         GROUP BY d.refobjid
                     )
                 ) AS temp GROUP BY id;"""  
@@ -102,7 +130,6 @@ def get_dependencies(file, logger):
             result = bbl_cursor.fetchall()
             for i in result:
                 expected_file.write("Operators {0} {1}\n".format(i[1],i[2]))
-                logger.info(i)
 
 
             logger.info('\nsys types : ')
@@ -115,7 +142,13 @@ def get_dependencies(file, logger):
                         WHERE d.refclassid = 'pg_type'::regclass 
                             AND d.deptype in ('n')
                             AND d.refobjid in (SELECT oid FROM pg_type WHERE typnamespace = 'sys'::regnamespace AND typtype in ('b','d') AND typcategory <> 'A')
-                            AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                            AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                                    THEN 'information_schema'::regnamespace
+                                END ,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                                    THEN 'information_schema_tsql'::regnamespace
+                                END)
                         GROUP BY d.refobjid
                     )
                         UNION ALL
@@ -125,7 +158,13 @@ def get_dependencies(file, logger):
                         WHERE d.refclassid = 'pg_type'::regclass 
                             AND d.deptype in ('n')
                             AND d.refobjid in (SELECT oid FROM pg_type WHERE typnamespace = 'sys'::regnamespace AND typtype in ('b','d') AND typcategory <> 'A')
-                            AND v.pronamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                            AND v.pronamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                                    THEN 'information_schema'::regnamespace
+                                END ,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                                    THEN 'information_schema_tsql'::regnamespace
+                                END)
                         GROUP BY d.refobjid
                     )
                         UNION ALL
@@ -133,9 +172,15 @@ def get_dependencies(file, logger):
                         FROM pg_depend AS d 
                         JOIN pg_type AS v on v.oid = d.objid 
                         WHERE d.refclassid = 'pg_type'::regclass 
-                        AND d.deptype in ('n')
-                        AND d.refobjid in (SELECT oid FROM pg_type WHERE typnamespace = 'sys'::regnamespace AND typtype in ('b','d') AND typcategory <> 'A')
-                        AND v.typnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                            AND d.deptype in ('n')
+                            AND d.refobjid in (SELECT oid FROM pg_type WHERE typnamespace = 'sys'::regnamespace AND typtype in ('b','d') AND typcategory <> 'A')
+                            AND v.typnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                                    THEN 'information_schema'::regnamespace
+                                END ,
+                                CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                                    THEN 'information_schema_tsql'::regnamespace
+                                END)
                         GROUP BY d.refobjid
                     )
                 ) AS temp GROUP BY id;"""
@@ -144,7 +189,6 @@ def get_dependencies(file, logger):
             result = bbl_cursor.fetchall()
             for i in result:
                 expected_file.write("Types {0} {1}\n".format(i[1],i[2]))
-                logger.info(i)
 
             logger.info('\nsys collations : ')
             # get user defined views,tables dependent on sys collations      
@@ -154,13 +198,18 @@ def get_dependencies(file, logger):
                 WHERE d.refclassid = 'pg_collation'::regclass 
                     AND d.deptype in ('n')
                     AND d.refobjid in (SELECT oid FROM pg_collation where collnamespace = 'sys'::regnamespace)
-                    AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema_tsql'::regnamespace, 'information_schema'::regnamespace)
+                    AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 
+                        CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+                            THEN 'information_schema'::regnamespace
+                        END ,
+                        CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+                            THEN 'information_schema_tsql'::regnamespace
+                        END)
                 GROUP BY d.refobjid;"""  
             bbl_cursor.execute(query)
             result = bbl_cursor.fetchall()
             for i in result:
                 expected_file.write("Collations {0} {1}\n".format(i[1],i[2]))
-                logger.info(i)
 
 
     except Exception as e:
@@ -281,3 +330,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# select count(*), relnamespace from pg_class where relnamespace in( 'sys'::regnamespace, 'pg_catalog'::regnamespace,
+#     CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema'))
+#          THEN 'information_schema'::regnamespace
+#     END ,
+#     CASE WHEN (SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'information_schema_tsql'))
+#          THEN 'information_schema_tsql'::regnamespace
+#     END 
+# )group by relnamespace;
