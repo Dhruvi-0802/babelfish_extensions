@@ -177,6 +177,9 @@ def get_dependencies(file_name, logger):
                 expected_file.write("Collations {0} {1}\n".format(i[1],i[2]))
         
         bbl_cursor.close()
+        if bbl_cnxn:
+            bbl_cnxn.close()
+            
     except Exception as e:
         logger.info(str(e))
     return version
