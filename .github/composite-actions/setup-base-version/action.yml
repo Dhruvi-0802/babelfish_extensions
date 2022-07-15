@@ -119,5 +119,6 @@ runs:
     - name: Upload artifacts
       if: always() && steps.run-dependency-check.outcome == 'failure'
       run: |
+        mkdir -p ~/upgrade
         cp test/python/output/upgrade_validation/* ~/upgrade
       shell: bash
