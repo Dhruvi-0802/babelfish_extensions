@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import subprocess
 
-def get_dependencies(file_name, logger):
+def get_dependencies(file, logger):
 
     bbl_cnxn = Db_Client_psycopg('localhost', 'jdbc_testdb', 'jdbc_user', logger)
 
@@ -29,16 +29,11 @@ def get_dependencies(file_name, logger):
             schema=''
 
         print(version)
-    
-        # path for output file
-        file = Path.cwd().joinpath("output", "upgrade_validation", version.replace('.','_'))
-        Path.mkdir(file, parents = True, exist_ok = True)
-        file = file.joinpath(file_name + ".out")
 
         with open(file, "w") as expected_file:
 
             # get user defined views dependent on sys views
-            logger.info('\nSys views : ')
+            logger.info('Finding dependencies on views')
             query = """SELECT d.refobjid, d.refobjid::regclass, count(distinct v.oid) AS total_count 
                 FROM pg_depend AS d 
                 JOIN pg_rewrite AS r ON r.oid = d.objid  
@@ -54,7 +49,7 @@ def get_dependencies(file_name, logger):
             for i in result:
                 expected_file.write("Views {0} {1}\n".format(i[1],i[2]))
 
-            logger.info('\nsys Functions : ')
+            logger.info('Finding dependencies on functions')
             # get user defined views dependent on sys functions 
 
             query = """SELECT id, id::regproc AS obj_name, sum(total_count) as dep_count 
@@ -88,7 +83,7 @@ def get_dependencies(file_name, logger):
                 expected_file.write("Functions {0} {1}\n".format(i[1],i[2]))
 
 
-            logger.info('\nsys operators : ')
+            logger.info('Finding dependencies on operators')
             # get user defined views dependent on sys operators      
             query = """SELECT id, id::regoperator AS obj_name, sum(total_count) AS dep_count 
                 FROM
@@ -121,7 +116,7 @@ def get_dependencies(file_name, logger):
                 expected_file.write("Operators {0} {1}\n".format(i[1],i[2]))
 
 
-            logger.info('\nsys types : ')
+            logger.info('Finding dependencies on types')
             # get user defined views & tables, union functions & procedures, union types dependent on sys types  
             query = """SELECT id, id::regtype AS obj_name, sum(total_count) AS dep_count 
                 FROM
@@ -161,7 +156,7 @@ def get_dependencies(file_name, logger):
             for i in result:
                 expected_file.write("Types {0} {1}\n".format(i[1],i[2]))
 
-            logger.info('\nsys collations : ')
+            logger.info('Finding dependencies on collations')
             # get user defined views,tables dependent on sys collations      
             query = """SELECT d.refobjid, d.refobjid::regcollation, count(distinct v.oid) AS total_count 
                 FROM pg_depend AS d 
@@ -179,7 +174,7 @@ def get_dependencies(file_name, logger):
         bbl_cursor.close()
         if bbl_cnxn:
             bbl_cnxn.close()
-            
+
     except Exception as e:
         logger.info(str(e))
     return version
@@ -187,17 +182,17 @@ def get_dependencies(file_name, logger):
 # compare the generated and expected file using diff
 def compare_outfiles(outfile, expected_file, logfname, filename, logger):
     try:
-        diff_file = Path.cwd().joinpath("logs", logfname, "upgrade_validation", filename + ".diff")
+        diff_file = Path.cwd().joinpath("logs", logfname, filename + ".diff")
         f_handle = open(diff_file, "wb")
 
         # sorting the files as set will give unordered outputs
         if sys.platform.startswith("win"):
-            proc_sort = subprocess.run(args = ["sort", expected_file, "/o", expected_file])
-            proc_sort = subprocess.run(args = ["sort", outfile, "/o", outfile])
+            subprocess.run(args = ["sort", expected_file, "/o", expected_file])
+            subprocess.run(args = ["sort", outfile, "/o", outfile])
             proc = subprocess.run(args = ["fc", expected_file, outfile], stdout = f_handle, stderr = f_handle)
         else:
-            proc_sort = subprocess.run(args = ["sort", "-o", expected_file, expected_file])
-            proc_sort = subprocess.run(args = ["sort", "-o", outfile, outfile])
+            subprocess.run(args = ["sort", "-o", expected_file, expected_file])
+            subprocess.run(args = ["sort", "-o", outfile, outfile])
             proc = subprocess.run(args = ["diff", "-a", "-u", "-I", "~~ERROR", expected_file, outfile], stdout = f_handle, stderr = f_handle)
         
         rcode = proc.returncode
@@ -227,18 +222,14 @@ def compare_outfiles(outfile, expected_file, logfname, filename, logger):
 
 
 # set up logger for the framework
-def create_logger():
+def create_logger(filename):
 
     # set up path for logger
     log_folder_name = datetime.now().strftime('log_%H_%M_%d_%m_%Y')
     path = Path.cwd().joinpath("logs", log_folder_name)
     Path.mkdir(path, parents = True, exist_ok = True)
 
-    filename = "upgrade_validation"
     logname = datetime.now().strftime(filename + '_%H_%M_%d_%m_%Y.log')
-
-    path = Path.cwd().joinpath("logs", log_folder_name, filename)
-    Path.mkdir(path, parents = True, exist_ok = True)
 
     # creating logger with two handlers, file as well as console
     # file logger
@@ -272,15 +263,18 @@ def close_logger(logger):
 
 def main():
 
-    logfname, logger = create_logger()
+    logfname, logger = create_logger("upgrade_validation")
     
     file_name = "expected_dependency"
 
-    version = get_dependencies(file_name, logger)
+    # path for output file
+    outfile = Path.cwd().joinpath("output", "upgrade_validation")
+    Path.mkdir(outfile, parents = True, exist_ok = True)
+    outfile = outfile.joinpath(file_name + ".out")
 
+    version = get_dependencies(outfile, logger)
     expected_file = Path.cwd().joinpath("expected", "upgrade_validation", str(version).replace('.','_'), file_name + ".out")
-    outfile = Path.cwd().joinpath("output", "upgrade_validation", str(version).replace('.','_'), file_name + ".out")
-    
+
     result = compare_outfiles(outfile, expected_file, logfname, file_name, logger)
 
     try:

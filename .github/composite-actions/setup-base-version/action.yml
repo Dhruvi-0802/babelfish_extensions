@@ -118,7 +118,5 @@ runs:
 
     - name: Upload artifacts
       if: always() && steps.run-dependency-check.outcome == 'failure'
-      uses: actions/upload-artifact@v2
-      with:
-        name: expected-output-files
-        path: test/python/output/upgrade_validation/*
+      run: |
+        cp test/python/output/upgrade_validation/ ~/upgrade
