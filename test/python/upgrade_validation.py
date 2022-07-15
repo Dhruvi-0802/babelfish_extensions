@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import subprocess
 
-def get_dependencies(file, logger):
+def get_dependencies(file_name, logger):
 
     bbl_cnxn = Db_Client_psycopg('localhost', 'jdbc_testdb', 'jdbc_user', logger)
 
@@ -16,19 +16,28 @@ def get_dependencies(file, logger):
         logger.error(str(e))
 
     try: 
+        bbl_cursor = bbl_cnxn.get_cursor()
+
+        # get current server version
+        bbl_cursor.execute("show server_version;")
+        version = bbl_cursor.fetchall()[0][0]
+
+        # adding filter for schema based on version
+        if float(version) > 13.5:
+            schema = ", 'information_schema_tsql'::regnamespace"
+        else:
+            schema=''
+
+        print(version)
+    
+        # path for output file
+        file = Path.cwd().joinpath("output", "upgrade_validation", version.replace('.','_'))
+        Path.mkdir(file, parents = True, exist_ok = True)
+        file = file.joinpath(file_name + ".out")
+
         with open(file, "w") as expected_file:
-            bbl_cursor = bbl_cnxn.get_cursor()
+
             # get user defined views dependent on sys views
-
-            bbl_cursor.execute("show server_version;")
-            version = float(bbl_cursor.fetchall()[0][0])
-            print(type(version))
-            if version > 13.5:
-                schema = ", 'information_schema_tsql'::regnamespace"
-            else:
-                schema=''
-
-            print(version)
             logger.info('\nSys views : ')
             query = """SELECT d.refobjid, d.refobjid::regclass, count(distinct v.oid) AS total_count 
                 FROM pg_depend AS d 
@@ -166,17 +175,16 @@ def get_dependencies(file, logger):
             result = bbl_cursor.fetchall()
             for i in result:
                 expected_file.write("Collations {0} {1}\n".format(i[1],i[2]))
-
-
+        
+        bbl_cursor.close()
     except Exception as e:
         logger.info(str(e))
-
-
+    return version
 
 # compare the generated and expected file using diff
 def compare_outfiles(outfile, expected_file, logfname, filename, logger):
     try:
-        diff_file = Path.cwd().joinpath("logs", logfname, "sql_validation", filename + ".diff")
+        diff_file = Path.cwd().joinpath("logs", logfname, "upgrade_validation", filename + ".diff")
         f_handle = open(diff_file, "wb")
 
         # sorting the files as set will give unordered outputs
@@ -223,7 +231,7 @@ def create_logger():
     path = Path.cwd().joinpath("logs", log_folder_name)
     Path.mkdir(path, parents = True, exist_ok = True)
 
-    filename = "sql_validation"
+    filename = "upgrade_validation"
     logname = datetime.now().strftime(filename + '_%H_%M_%d_%m_%Y.log')
 
     path = Path.cwd().joinpath("logs", log_folder_name, filename)
@@ -263,26 +271,24 @@ def main():
 
     logfname, logger = create_logger()
     
-    file_name = "dependency_check"
+    file_name = "expected_dependency"
 
-    outfile = Path.cwd().joinpath("output", "sql_validation_framework")
-    Path.mkdir(outfile, parents = True, exist_ok = True)
-    outfile = outfile.joinpath(file_name + ".out")
+    version = get_dependencies(file_name, logger)
 
-    expected_file = Path.cwd().joinpath("expected", "sql_validation_framework", file_name + ".out")
-    get_dependencies(outfile, logger)
+    expected_file = Path.cwd().joinpath("expected", "upgrade_validation", str(version).replace('.','_'), file_name + ".out")
+    outfile = Path.cwd().joinpath("output", "upgrade_validation", str(version).replace('.','_'), file_name + ".out")
     
-    result2 = compare_outfiles(outfile, expected_file, logfname, file_name, logger)
+    result = compare_outfiles(outfile, expected_file, logfname, file_name, logger)
 
     try:
-        assert result2 == True
+        assert result == True
         logger.info("Test Passed!")
     except AssertionError as e:
         logger.error("Test Failed!")
 
     close_logger(logger)
 
-    assert result2 == True
+    assert result == True
 
 if __name__ == "__main__":
     main()

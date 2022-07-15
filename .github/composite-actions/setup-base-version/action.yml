@@ -105,7 +105,7 @@ runs:
       if: always() && steps.install-python.outcome == 'success'
       run: |
         cd ~
-        pip3 install pyodbc pymssql psycopg2
+        pip3 install psycopg2
       shell: bash
 
     - name: Run dependency check
@@ -121,4 +121,4 @@ runs:
       uses: actions/upload-artifact@v2
       with:
         name: expected-output-files
-        path: test/python/output/sql_validation_framework/*
+        path: test/python/output/upgrade_validation/*
