@@ -110,5 +110,6 @@ jobs:
           path: |
             ~/upgrade/*.log
             ~/upgrade/*.diff
+            ~/upgrade/*.out
             ~/postgres*/data/logfile
             
