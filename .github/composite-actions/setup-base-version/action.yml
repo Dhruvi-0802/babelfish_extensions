@@ -120,3 +120,4 @@ runs:
       if: always() && steps.run-dependency-check.outcome == 'failure'
       run: |
         cp test/python/output/upgrade_validation/ ~/upgrade
+      shell: bash
