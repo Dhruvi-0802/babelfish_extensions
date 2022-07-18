@@ -35,7 +35,7 @@ def get_dependencies(file, sumfile, logger):
         with open(file, "w") as expected_file, open(sumfile, "w") as summary_file:
 
             writer = csv.writer(summary_file, delimiter = ";")
-            writer.write(["Object_class", "Object_name", "dependency_count"])
+            writer.writerow(["Object_class", "Object_name", "dependency_count"])
 
             # get user defined objects from pg_class dependent on sys views
             logger.info('Finding dependencies on views')
@@ -60,7 +60,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
 
             for i in result:
-                summary_file.write(["view", i[1], i[2]])
+                writer.writerow(["view", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get views with no dependency 
@@ -104,7 +104,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write(["function", i[1], i[2]])
+                writer.writerow(["function", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get functions with no dependency 
@@ -147,7 +147,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write(["operator", i[1], i[2]])
+                writer.writerow(["operator", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get operators with no dependency 
@@ -199,7 +199,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write(["type", i[1], i[2]])
+                writer.writerow(["type", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get type with no dependency 
@@ -226,7 +226,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write(["collation", i[1], i[2]])
+                writer.writerow(["collation", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get collations with no dependency 
