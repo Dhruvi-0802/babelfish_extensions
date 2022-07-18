@@ -3,6 +3,7 @@ import logging
 from utils.db_client_psql import Db_Client_psycopg
 from pathlib import Path
 import sys
+import csv
 import subprocess
 
 def get_dependencies(file, sumfile, logger):
@@ -33,7 +34,8 @@ def get_dependencies(file, sumfile, logger):
 
         with open(file, "w") as expected_file, open(sumfile, "w") as summary_file:
 
-            summary_file.write("{0},{1},{2}\n".format("Object_class", "Object_name", "dependency_count"))
+            writer = csv.writer(summary_file, delimiter = ";")
+            writer.write(["Object_class", "Object_name", "dependency_count"])
 
             # get user defined objects from pg_class dependent on sys views
             logger.info('Finding dependencies on views')
@@ -58,7 +60,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
 
             for i in result:
-                summary_file.write("{0},{1},{2}\n".format("view", i[1], i[2]))
+                summary_file.write(["view", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get views with no dependency 
@@ -102,7 +104,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write("{0},{1},{2}\n".format("function", i[1], i[2]))
+                summary_file.write(["function", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get functions with no dependency 
@@ -145,7 +147,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write("{0},{1},{2}\n".format("operator", i[1], i[2]))
+                summary_file.write(["operator", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get operators with no dependency 
@@ -197,7 +199,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write("{0},{1},{2}\n".format("type", i[1], i[2]))
+                summary_file.write(["type", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get type with no dependency 
@@ -224,7 +226,7 @@ def get_dependencies(file, sumfile, logger):
             dep_object = []
             result = cursor.fetchall()
             for i in result:
-                summary_file.write("{0},{1},{2}\n".format("collation", i[1], i[2]))
+                summary_file.write(["collation", i[1], i[2]])
                 dep_object.append(i[1])
 
             # get collations with no dependency 
