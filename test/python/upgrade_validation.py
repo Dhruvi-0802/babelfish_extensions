@@ -34,7 +34,7 @@ def get_dependencies(file, sumfile, logger):
 
         with open(file, "w") as expected_file, open(sumfile, "w") as summary_file:
 
-            writer = csv.writer(summary_file, delimiter = ";")
+            writer = csv.writer(summary_file, delimiter = ",")
             writer.writerow(["Object_class", "Object_name", "dependency_count"])
 
             # get user defined objects from pg_class dependent on sys views
