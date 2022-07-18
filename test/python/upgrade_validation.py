@@ -5,34 +5,35 @@ from pathlib import Path
 import sys
 import subprocess
 
-def get_dependencies(file, logger):
+def get_dependencies(file, sumfile, logger):
 
-    bbl_cnxn = Db_Client_psycopg('localhost', 'jdbc_testdb', 'jdbc_user', logger)
+    # connect to psql endpoint
+    # using default port 5432
+    cnxn = Db_Client_psycopg('localhost', 'jdbc_testdb', 'jdbc_user', logger)
 
     try:
-        curs2 = bbl_cnxn.get_cursor()
+        curs2 = cnxn.get_cursor()
         curs2.close()
     except Exception as e:
         logger.error(str(e))
+        return -1
 
     try: 
-        bbl_cursor = bbl_cnxn.get_cursor()
+        cursor = cnxn.get_cursor()
 
-        # get current server version
-        bbl_cursor.execute("show server_version;")
-        version = bbl_cursor.fetchall()[0][0]
+        # get current engine version
+        cursor.execute("show server_version;")
+        version = float(cursor.fetchall()[0][0])
 
-        # adding filter for schema based on version
-        if float(version) > 13.5:
+        # adding filter for information_schema_tsql based on engine version
+        if version > 13.5:
             schema = ", 'information_schema_tsql'::regnamespace"
         else:
             schema=''
 
-        print(version)
+        with open(file, "w") as expected_file, open(sumfile, "w") as summary_file:
 
-        with open(file, "w") as expected_file:
-
-            # get user defined views dependent on sys views
+            # get user defined objects from pg_class dependent on sys views
             logger.info('Finding dependencies on views')
             query = """SELECT d.refobjid, d.refobjid::regclass, count(distinct v.oid) AS total_count 
                 FROM pg_depend AS d 
@@ -44,14 +45,15 @@ def get_dependencies(file, logger):
                     AND d.refobjid in (SELECT oid FROM pg_class where relkind = 'v' and relnamespace = 'sys'::regnamespace)
                     AND v.relnamespace not in('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema'::regnamespace{0})
                 GROUP BY d.refobjid; """
-            bbl_cursor.execute(query.format(schema))
-            result = bbl_cursor.fetchall()
+            cursor.execute(query.format(schema))
+            result = cursor.fetchall()
             for i in result:
-                expected_file.write("Views {0} {1}\n".format(i[1],i[2]))
+                expected_file.write("Found objects dependent on view {}\n".format(i[1]))
+                summary_file.write("View {0} {1}\n".format(i[1],i[2]))
 
+
+            # get user defined objects from pg_class dependent on sys functions 
             logger.info('Finding dependencies on functions')
-            # get user defined views dependent on sys functions 
-
             query = """SELECT id, id::regproc AS obj_name, sum(total_count) as dep_count 
                 FROM
                 (   (   SELECT d.refobjid AS id, d.refobjid::regproc, count(distinct v.oid) AS total_count 
@@ -76,15 +78,17 @@ def get_dependencies(file, logger):
                         GROUP BY d.refobjid
                     )
                 ) AS temp GROUP BY id;"""       
-            bbl_cursor.execute(query.format(schema))
+            cursor.execute(query.format(schema))
 
-            result = bbl_cursor.fetchall()
+            result = cursor.fetchall()
             for i in result:
-                expected_file.write("Functions {0} {1}\n".format(i[1],i[2]))
+                expected_file.write("Found objects dependent on function {}\n".format(i[1]))
+                summary_file.write("Function {0} {1}\n".format(i[1],i[2]))
 
 
-            logger.info('Finding dependencies on operators')
-            # get user defined views dependent on sys operators      
+
+            # get user defined views dependent on sys operators   
+            logger.info('Finding dependencies on operators')   
             query = """SELECT id, id::regoperator AS obj_name, sum(total_count) AS dep_count 
                 FROM
                 (   (   SELECT d.refobjid AS id, d.refobjid::regoperator, count(distinct v.oid) AS total_count 
@@ -109,15 +113,17 @@ def get_dependencies(file, logger):
                         GROUP BY d.refobjid
                     )
                 ) AS temp GROUP BY id;"""  
-            bbl_cursor.execute(query.format(schema))
+            cursor.execute(query.format(schema))
 
-            result = bbl_cursor.fetchall()
+            result = cursor.fetchall()
             for i in result:
-                expected_file.write("Operators {0} {1}\n".format(i[1],i[2]))
+                expected_file.write("Found objects dependent on operator {}\n".format(i[1]))
+                summary_file.write("Operator {0} {1}\n".format(i[1],i[2]))
 
 
-            logger.info('Finding dependencies on types')
-            # get user defined views & tables, union functions & procedures, union types dependent on sys types  
+
+            # get user defined views & tables, union functions & procedures, union types dependent on sys types
+            logger.info('Finding dependencies on types') 
             query = """SELECT id, id::regtype AS obj_name, sum(total_count) AS dep_count 
                 FROM
                 (   (   SELECT d.refobjid AS id, d.refobjid::regtype, count(distinct v.oid) AS total_count 
@@ -151,10 +157,11 @@ def get_dependencies(file, logger):
                     )
                 ) AS temp GROUP BY id;"""
 
-            bbl_cursor.execute(query.format(schema))
-            result = bbl_cursor.fetchall()
+            cursor.execute(query.format(schema))
+            result = cursor.fetchall()
             for i in result:
-                expected_file.write("Types {0} {1}\n".format(i[1],i[2]))
+                expected_file.write("Found objects dependent on type {}\n".format(i[1]))
+                summary_file.write("Type {0} {1}\n".format(i[1],i[2]))
 
             logger.info('Finding dependencies on collations')
             # get user defined views,tables dependent on sys collations      
@@ -166,14 +173,16 @@ def get_dependencies(file, logger):
                     AND d.refobjid in (SELECT oid FROM pg_collation where collnamespace = 'sys'::regnamespace)
                     AND v.relnamespace not in ('sys'::regnamespace, 'pg_catalog'::regnamespace, 'information_schema'::regnamespace{0})
                 GROUP BY d.refobjid;"""  
-            bbl_cursor.execute(query.format(schema))
-            result = bbl_cursor.fetchall()
+            cursor.execute(query.format(schema))
+            result = cursor.fetchall()
             for i in result:
-                expected_file.write("Collations {0} {1}\n".format(i[1],i[2]))
+                expected_file.write("Found objects dependent on collation {}\n".format(i[1]))
+                summary_file.write("Collation {0} {1}\n".format(i[1],i[2]))
         
-        bbl_cursor.close()
-        if bbl_cnxn:
-            bbl_cnxn.close()
+        cursor.close()
+
+        if cnxn:
+            cnxn.close()
 
     except Exception as e:
         logger.info(str(e))
@@ -270,9 +279,19 @@ def main():
     # path for output file
     outfile = Path.cwd().joinpath("output", "upgrade_validation")
     Path.mkdir(outfile, parents = True, exist_ok = True)
+    summaryfile = outfile.joinpath("dependency_count" + ".out")
     outfile = outfile.joinpath(file_name + ".out")
 
-    version = get_dependencies(outfile, logger)
+    version = get_dependencies(outfile, summaryfile, logger)
+
+    try:
+        assert version > 0
+    except AssertionError as e:
+        logger.error("Can't connect to database! Test Failed!")
+        close_logger(logger)
+
+    assert version > 0
+
     expected_file = Path.cwd().joinpath("expected", "upgrade_validation", str(version).replace('.','_'), file_name + ".out")
 
     result = compare_outfiles(outfile, expected_file, logfname, file_name, logger)
