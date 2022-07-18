@@ -111,5 +111,6 @@ jobs:
             ~/upgrade/*.log
             ~/upgrade/*.diff
             ~/upgrade/*.out
+            ~/upgrade/*.csv
             ~/postgres*/data/logfile
             
