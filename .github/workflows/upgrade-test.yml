@@ -70,6 +70,7 @@ jobs:
           engine_branch: ${{ steps.find-branch.outputs.base-engine-branch }}
           extension_branch: ${{ steps.find-branch.outputs.base-extension-branch }}
           install_dir: ${{ steps.find-branch.outputs.base-dir }}
+          base_version: ${{ steps.read-base-and-final-version.outputs.base-version}}
 
       - name: Setup Upgrade Version Composite Action
         id: setup-upgrade-ver-ca

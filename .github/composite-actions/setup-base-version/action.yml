@@ -9,6 +9,9 @@ inputs:
   install_dir:
     description: "Install base version in this directory"
     required: true
+  base_version:
+    description: "Run upgrade validation framework based on the base version"
+    required: true
 
 runs:
   using: "composite"
@@ -93,9 +96,16 @@ runs:
         mvn test
       shell: bash
 
+    - name: Check base version to run validation
+      id: check-base-version
+      if: ${{ inputs.base_version == '13.6' }} && steps.jdbc-upgrade-tests.outcome == 'success'
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+
     - name: Install Python
       id: install-python
-      if: always() && steps.jdbc-upgrade-tests.outcome == 'success'
+      if: always() && steps.check-base-version.outcome == 'success'
       uses: actions/setup-python@v2
       with:
         python-version: 3.7
