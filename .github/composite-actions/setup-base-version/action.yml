@@ -98,7 +98,7 @@ runs:
 
     - name: Check base version to run validation
       id: check-base-version
-      if: ${{ inputs.base_version == '13.6' }} && steps.jdbc-upgrade-tests.outcome == 'success'
+      if: ${{ inputs.base_version == '13_6' }} && steps.jdbc-upgrade-tests.outcome == 'success'
       uses: actions/setup-python@v2
       with:
         python-version: 3.7
