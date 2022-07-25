@@ -107,8 +107,8 @@ runs:
       id: configure-python-environment
       if: always() && steps.install-python.outcome == 'success'
       run: |
-        echo "$inputs.base_version"
-        echo "$matrix.upgrade-path"
+        echo ${{ inputs.base_version }}
+        echo ${{ matrix.upgrade-path }}
         cd ~
         pip3 install psycopg2
       shell: bash
