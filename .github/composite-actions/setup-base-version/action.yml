@@ -108,7 +108,15 @@ runs:
       if: always() && steps.install-python.outcome == 'success'
       run: |
         echo ${{ inputs.base_version }}
-        echo ${{ matrix.upgrade-path.path }}[0]
+        echo ${{ inputs.base_version == '13.4' }}
+        echo ${{ inputs.base_version == "13.4" }}
+        echo ${{ inputs.base_version == 13.4 }}
+        echo ${{ inputs.base_version }} == '13.4'
+        echo ${{ inputs.base_version }} == "13.4"
+        echo ${{ inputs.base_version }} == 13.4
+        echo ${{ matrix.upgrade-path.path[0] }}
+        echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
+
         cd ~
         pip3 install psycopg2
       shell: bash
