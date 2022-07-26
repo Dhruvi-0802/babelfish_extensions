@@ -98,7 +98,7 @@ runs:
 
     - name: Install Python
       id: install-python
-      if: ${{ inputs.base_version }} == "13.6" && steps.jdbc-upgrade-tests.outcome == 'success'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.jdbc-upgrade-tests.outcome == 'success'
       uses: actions/setup-python@v2
       with:
         python-version: 3.7
@@ -114,7 +114,6 @@ runs:
         echo ${{ inputs.base_version }} == 13.4
         echo ${{ matrix.upgrade-path.path[0] }}
         echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
-
         cd ~
         pip3 install psycopg2
       shell: bash
