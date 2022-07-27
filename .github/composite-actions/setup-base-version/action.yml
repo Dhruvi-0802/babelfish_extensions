@@ -95,14 +95,14 @@ runs:
 
     - name: Install Python
       id: install-python
-      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.jdbc-upgrade-tests.outcome == 'success'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' && steps.jdbc-upgrade-tests.outcome == 'success' }}
       uses: actions/setup-python@v2
       with:
         python-version: 3.7
 
     - name: Configure Python Environment
       id: configure-python-environment
-      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.install-python.outcome == 'success'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6'  && steps.install-python.outcome == 'success' }}
       run: |
         cd ~
         sudo apt-get install unixodbc-dev
@@ -120,7 +120,7 @@ runs:
 
     - name: Run dependency check
       id: run-dependency-check
-      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.configure-python-environment.outcome == 'success'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' && steps.configure-python-environment.outcome == 'success' }}
       run: |
         cd test/python
         echo ${{ steps.configure-python-environment.outcome }}
@@ -128,7 +128,7 @@ runs:
       shell: bash
 
     - name: Upload artifacts
-      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.run-dependency-check.outcome == 'failure'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' && steps.run-dependency-check.outcome == 'failure' }}
       run: |
         mkdir -p ~/upgrade
         echo ${{ steps.run-dependency-check.outcome }}
