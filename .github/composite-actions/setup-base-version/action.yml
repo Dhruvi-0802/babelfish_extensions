@@ -9,9 +9,6 @@ inputs:
   install_dir:
     description: "Install base version in this directory"
     required: true
-  base_version:
-    description: "Run upgrade validation framework based on the base version"
-    required: true
 
 runs:
   using: "composite"
@@ -105,30 +102,28 @@ runs:
 
     - name: Configure Python Environment
       id: configure-python-environment
-      if: always() && steps.install-python.outcome == 'success'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.install-python.outcome == 'success'
       run: |
-        echo ${{ inputs.base_version }}
-        echo ${{ inputs.base_version == '13.4' }}
-        echo ${{ inputs.base_version == 13.4 }}
-        echo ${{ inputs.base_version }} == '13.4'
-        echo ${{ inputs.base_version }} == 13.4
-        echo ${{ matrix.upgrade-path.path[0] }}
         echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
+        echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
+        echo ${{ steps.install-python.outcome }}
         cd ~
         pip3 install psycopg2
       shell: bash
 
     - name: Run dependency check
       id: run-dependency-check
-      if: always() && steps.configure-python-environment.outcome == 'success'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.configure-python-environment.outcome == 'success'
       run: |
         cd test/python
+        echo ${{ steps.configure-python-environment.outcome }}
         python3 upgrade_validation.py
       shell: bash
 
     - name: Upload artifacts
-      if: always() && steps.run-dependency-check.outcome == 'failure'
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.run-dependency-check.outcome == 'failure'
       run: |
         mkdir -p ~/upgrade
+        echo ${{ steps.run-dependency-check.outcome }}
         cp test/python/output/upgrade_validation/* ~/upgrade
       shell: bash
