@@ -93,19 +93,11 @@ runs:
         mvn test
       shell: bash
 
-    - name: Install Python
-      id: install-python
-      if: ${{ matrix.upgrade-path.path[0] == source.latest' && steps.jdbc-upgrade-tests.outcome == 'success' }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.7
-
     - name: Configure Python Environment
       id: configure-python-environment
-      if: always()  && steps.install-python.outcome == 'success'
+      if: ${{ matrix.upgrade-path.path[0] == 'source.latest' && steps.jdbc-upgrade-tests.outcome == 'success' }}
       run: |
         cd ~
-        sudo apt-get install unixodbc-dev
         odbcinst -j
         cat /etc/odbcinst.ini
         apt search postgre | grep odbc
@@ -113,7 +105,7 @@ runs:
         odbcinst -j
         cat /etc/odbcinst.ini
         pip3 install psycopg2
-        echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
+        echo ${{ matrix.upgrade-path.path[0] }}
         echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
         echo ${{ steps.install-python.outcome }}
       shell: bash
@@ -128,7 +120,7 @@ runs:
       shell: bash
 
     - name: Upload artifacts
-      if: $always() && steps.run-dependency-check.outcome == 'failure'
+      if: always() && steps.run-dependency-check.outcome == 'failure'
       run: |
         mkdir -p ~/upgrade
         echo ${{ steps.run-dependency-check.outcome }}
