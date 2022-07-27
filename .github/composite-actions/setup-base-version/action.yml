@@ -106,7 +106,7 @@ runs:
       run: |
         cd ~
         sudo apt-get install unixodbc-dev
-        echo ${{ odbcinst -j }}
+        odbcinst -j
         cat /etc/odbcinst.ini
         pip3 install psycopg2
         echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
