@@ -108,9 +108,11 @@ runs:
         sudo apt-get install unixodbc-dev
         odbcinst -j
         cat /etc/odbcinst.ini
+        apt search postgre
+        apt search postgre | grep odbc
         pip3 install psycopg2
         echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
-        echo ${{ matrix.upgrade-path.path[0] == '13_4' }} && steps.install-python.outcome == 'success'
+        echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
         echo ${{ steps.install-python.outcome }}
       shell: bash
 
