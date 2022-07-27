@@ -104,11 +104,14 @@ runs:
       id: configure-python-environment
       if: ${{ matrix.upgrade-path.path[0] == '13_6' }} && steps.install-python.outcome == 'success'
       run: |
-        echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
-        echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
-        echo ${{ steps.install-python.outcome }}
         cd ~
+        sudo apt-get install unixodbc-dev
+        echo ${{ odbcinst -j }}
+        cat /etc/odbcinst.ini
         pip3 install psycopg2
+        echo ${{ matrix.upgrade-path.path[0] == '13_4' }}
+        echo ${{ matrix.upgrade-path.path[0] == '13_4' }} && steps.install-python.outcome == 'success'
+        echo ${{ steps.install-python.outcome }}
       shell: bash
 
     - name: Run dependency check
