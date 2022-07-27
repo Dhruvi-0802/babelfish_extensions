@@ -95,7 +95,7 @@ runs:
 
     - name: Configure Python Environment
       id: configure-python-environment
-      if: ${{ matrix.upgrade-path.path[0] == 'source.latest' && steps.jdbc-upgrade-tests.outcome == 'success' }}
+      if: ${{ matrix.upgrade-path.path[0] == '13_6' && steps.jdbc-upgrade-tests.outcome == 'success' }}
       run: |
         cd ~
         odbcinst -j
